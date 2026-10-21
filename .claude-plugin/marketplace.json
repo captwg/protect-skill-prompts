@@ -1,0 +1,15 @@
+{
+  "name": "captwg",
+  "description": "Agent skills by captwg for building AI products safely.",
+  "owner": {
+    "name": "captwg",
+    "url": "https://github.com/captwg"
+  },
+  "plugins": [
+    {
+      "name": "protect-skill-prompts",
+      "source": "./",
+      "description": "Keep prompt templates, skill instructions and system prompts out of the browser when building AI features, and verify it with a leak scanner."
+    }
+  ]
+}

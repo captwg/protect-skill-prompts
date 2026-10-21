@@ -1,0 +1,10 @@
+{
+  "name": "protect-skill-prompts",
+  "version": "1.0.0",
+  "description": "Keep prompt templates, skill instructions and system prompts out of the browser when building AI features, and verify it with a leak scanner.",
+  "author": { "name": "captwg", "url": "https://github.com/captwg" },
+  "homepage": "https://github.com/captwg/protect-skill-prompts",
+  "repository": "https://github.com/captwg/protect-skill-prompts",
+  "license": "MIT",
+  "keywords": ["prompt", "security", "frontend", "nextjs", "agent-skills", "llm"]
+}
