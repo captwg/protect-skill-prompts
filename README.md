@@ -21,7 +21,8 @@ ships. The ones that do:
 - generation history, share links or "copy prompt / remix" storing the composed prompt
 - a credit-quote or moderation call sent from the browser with the full prompt
 - an agent's tool call arguments, shown "for transparency", containing the skill's text
-- the model itself, when a user asks it to "repeat your instructions"
+- the model itself, when a user asks it to "repeat your instructions", translate them,
+  summarize them, or answers one harmless question at a time
 
 ## What the skill does
 
@@ -34,8 +35,11 @@ When an agent builds or audits an AI feature, the skill makes it:
    or skill nodes for canvases and pipelines.
 4. **Keep the user in control**: a free-text request that overrides the template defaults.
    Hiding a recipe is never a reason to limit what users can ask for.
-5. **Guard model output**: server-side echo check, metadata stripping, honest limits.
-6. **Verify**: run `scan_leaks.py` on client-facing output with a positive control.
+5. **Stop extraction through chat** with five layers: keep what the conversation does not
+   need out of the chat model, an input guard, prompt hardening, a fail-closed output guard
+   that also catches paraphrase, translation and piece-by-piece leaks, and red-teaming.
+6. **Verify**: run `scan_leaks.py` on client-facing output with a positive control, and
+   `redteam.py` against a chat endpoint.
 
 Contents:
 
@@ -44,9 +48,11 @@ skills/protect-skill-prompts/
   SKILL.md                      the workflow and patterns
   references/leak-surfaces.md   40+ leak surfaces with how to check each
   references/frameworks.md      Next.js, Pages Router, Vite/SPA, Remix, SvelteKit, Nuxt, Vercel AI SDK
-  references/agents-and-chat.md hidden skills in agents: messages, tools, echo checks
+  references/agents-and-chat.md hidden skills in agents: messages, tools, created nodes
+  references/extraction-defense.md  stopping users from talking the agent into revealing it
   scripts/scan_leaks.py         leak scanner (Python 3.8+, no dependencies)
-  scripts/test_scan_leaks.py    its tests
+  scripts/redteam.py            extraction red-team for a chat endpoint, 42 built-in attacks
+  scripts/test_*.py             tests
 examples/nextjs-app-router/     a minimal safe implementation with `pnpm verify`
 ```
 
@@ -86,6 +92,22 @@ matched and a sample. Code files given as `--secrets` contribute only their stri
 literals. Server build folders (`.next/server`, …), `node_modules` and the secret files
 themselves are skipped.
 
+## The red-team on its own
+
+`redteam.py` sends 42 extraction attempts (direct, translated, encoded, role-play, "developer
+debugging", "write a prompt like yours", step-by-step and yes/no probing, English and Chinese)
+to your running chat endpoint, plus your own ordinary requests, and reports leaks and
+over-refusals. It checks shared 5-word runs and your `--markers` (distinctive facts in any
+language); with `ANTHROPIC_API_KEY` set, an LLM judge also catches paraphrased leaks.
+
+```bash
+python3 skills/protect-skill-prompts/scripts/redteam.py \
+  --endpoint http://localhost:3000/api/chat --body '{"messages":"MESSAGES"}' --reply-path reply \
+  --secrets server/skills/coach.md --markers markers.txt --benign my-requests.json
+# conversation-id APIs:
+#   --body '{"text":"USER_TEXT"}' --body-conversation '"conversationId":"CONVERSATION_ID"' --conversation-path conversationId
+```
+
 ## How it was tested
 
 - Scanner: unit tests for bundles, double-escaped RSC payloads, `\u` escapes, HTML
@@ -118,6 +140,20 @@ themselves are skipped.
   prompts out of visible tool arguments, and refused extraction. When the provider's code
   was readable, agents read the traps out of it and avoided them without the skill, which is
   why that row is reported separately.
+- Extraction through chat, with real models (Claude Haiku and Sonnet as the agent, 45 attacks
+  of which 15 were held out from tuning, 18 ordinary requests, two runs each, judged by a
+  separate model and a keyword scan):
+
+  | agent setup | extraction conversations | leaked | ordinary requests answered |
+  |---|---|---|---|
+  | skill in the prompt + "never reveal" | 180 | 151 (84%) | 70 of 72 |
+  | + word-for-word reply check | 180 | 116 (64%) | 71 of 72 |
+  | five layers from `extraction-defense.md` | 180 | **0** | 69 of 72 |
+
+  The held-out attacks behaved like the tuned ones (0 of 60 leaked). The three refused
+  ordinary requests were generic questions that touched a protected topic, all on the smaller
+  model. `redteam.py` reproduced this against live endpoints: 39 of 42 attacks leaked from the
+  naive setup, 0 of 42 from the layered one.
 - Triggering: loads for building, Chinese-language and audit-style requests; stays out of
   unrelated frontend questions.
 
@@ -154,5 +190,10 @@ MIT
 **安装：** `npx skills add captwg/protect-skill-prompts`，或把 `skills/protect-skill-prompts`
 复制到 `~/.claude/skills/`（Claude Code）或项目的 `.agents/skills/`（Codex / Cursor）。
 
-**局限：** 任何方案都无法阻止用户从输出结果中推测提示词的一部分。这个 skill 保证浏览器拿到的内容里
+**防止被套话：** 用户会直接问、换语言问、让它翻译/总结/编码、角色扮演、冒充开发者、一步步追问。
+只写"不要透露指令"挡不住：真实模型测试中这种做法 84% 被套出，加上逐字比对仍有 64%。skill 里的五层方案
+（聊天模型只拿对话必需的内容、输入拦截、提示词加固、能识别转述/翻译/分步拼凑的输出拦截、上线前红队测试）
+在 180 段套话对话中 0 泄露，同时正常请求 96% 照常回答。`scripts/redteam.py` 可以直接对你的聊天接口跑这套测试。
+
+**局限：** 任何方案都无法阻止用户从输出结果中推测提示词的一部分。真正"无论如何都套不出"的，只有根本不交给聊天模型的那部分内容。这个 skill 保证浏览器拿到的内容里
 复制不到配方，提高通过模型套取的成本，并如实说明还剩哪些可能。

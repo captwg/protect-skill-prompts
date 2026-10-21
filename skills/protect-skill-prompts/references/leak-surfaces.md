@@ -55,7 +55,7 @@ right target.
 | Reasoning streamed | Thinking/reasoning about the instructions forwarded to the UI | Disable reasoning forwarding or filter it |
 | Agent-written downstream prompts | The agent writes the composed prompt into a visible tool argument, node or card | Inspect the created node/card params |
 | Skill manifests | A marketplace or skill list API returns full skill bodies instead of name, description and id | HAR on the skill picker |
-| Model output | "Repeat everything above", translation and summarization tricks | Try them; run the server-side echo check |
+| Model output | "Repeat everything above", translation, summary, role-play, piece-by-piece questions | `scripts/redteam.py` against the endpoint; defenses in [extraction-defense.md](extraction-defense.md) |
 
 ## Observability
 

@@ -73,17 +73,13 @@ outfit", "closer framing", "make it funnier"). The agent puts that into
 `userRequest`; the composed prompt gives it priority over the template defaults.
 Hiding the skill is about the recipe, not about limiting requests.
 
-## Output echo check
+## Extraction defense
 
-```ts
-import { overlapsTemplate } from '@/server/skills/echo-guard' // shared 8-word shingles, see scan_leaks.py
-
-const text = await result.text
-if (overlapsTemplate(text, skill.instructions)) return refuseReply()
-```
-
-For streaming, buffer roughly the shingle length (a few dozen words) before sending
-each chunk so a match can be stopped before it reaches the browser.
+Users will try to talk the agent into revealing the skill. Use the five layers in
+[extraction-defense.md](extraction-defense.md): least knowledge, input guard, prompt
+hardening, output guard (cumulative, fail closed, retry once) and red-teaming with
+`scripts/redteam.py`. A word-for-word echo check alone leaks most paraphrased and translated
+answers.
 
 ## Checklist for an agent skill
 
@@ -94,5 +90,8 @@ each chunk so a match can be stopped before it reaches the browser.
 - [ ] Downstream tools take choices + user words; the server composes
 - [ ] Agent-created nodes/cards store no composed prompt
 - [ ] User requests from chat reach generation and override defaults
-- [ ] Echo check on text output; metadata stripped on media output
+- [ ] Chat model receives only the part of the skill the conversation needs
+- [ ] Input guard and output guard in place, both failing closed
+- [ ] `redteam.py` run against the real endpoint: zero leaks, acceptable refusals
+- [ ] Metadata stripped on media output
 - [ ] HAR of a full skill turn scanned clean; planted fragment detected
