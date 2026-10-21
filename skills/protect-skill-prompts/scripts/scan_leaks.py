@@ -36,6 +36,8 @@ DEFAULT_EXCLUDES = ['*/node_modules/*', '*/.git/*', '*/.next/server/*', '*/.next
 CJK = re.compile(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]')
 TOKEN = re.compile(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]|[^\W_]+', re.UNICODE)
 STRING_LITERAL = re.compile(r'"(?:[^"\\\n]|\\.)*"|\'(?:[^\'\\\n]|\\.)*\'|`(?:[^`\\]|\\.)*`', re.S)
+# Template placeholders: fingerprints never span one, since the filled-in value differs.
+PLACEHOLDER = re.compile(r'\$\{[^}]*\}|\{\{[^}]*\}\}|\{[A-Za-z_][\w.]*\}|%\(\w+\)s|%s')
 ESCAPES = [
     (re.compile(r'\\u([0-9a-fA-F]{4})'), lambda m: chr(int(m.group(1), 16))),
     (re.compile(r'\\x([0-9a-fA-F]{2})'), lambda m: chr(int(m.group(1), 16))),
@@ -82,11 +84,14 @@ def walk(path):
 class Secret:
     def __init__(self, name, text, words):
         self.name = name
-        toks = tokens(text)
-        self.shingles = set(shingles(toks, words))
-        self.short = not self.shingles and len(toks) >= 4
-        if self.short:  # shorter than one shingle: match it whole
-            self.shingles.add(' '.join(toks))
+        self.shingles, self.short_lengths = set(), set()
+        for part in PLACEHOLDER.split(text):
+            toks = tokens(part)
+            found = set(shingles(toks, words))
+            if not found and len(toks) >= 4:  # shorter than one shingle: match it whole
+                found = {' '.join(toks)}
+                self.short_lengths.add(len(toks))
+            self.shingles |= found
 
 
 def secret_texts(path):
@@ -222,7 +227,7 @@ def main(argv=None):
         items.append([('<stdin>', sys.stdin.read())])
 
     every = set().union(*(s.shingles for s in secrets))
-    index = (every, {sh.count(' ') + 1 for s in secrets if s.short for sh in s.shingles}, args.words)
+    index = (every, set().union(*(s.short_lengths for s in secrets)), args.words)
     hits, scanned = [], 0
     for group in items:
         for label, text in group:

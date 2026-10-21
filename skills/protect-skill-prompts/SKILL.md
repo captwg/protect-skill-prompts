@@ -160,8 +160,11 @@ python3 scripts/scan_leaks.py --secrets server/skills session.har
 ```
 
 Exit code 1 means a leak; each hit names the file (or HAR entry), how much of which
-secret matched, and a snippet. The scanner finds verbatim copies, including escaped and
-partial ones; it cannot see a paraphrase. A field that a model writes from the template
+secret matched, and a snippet. Fingerprints stop at template placeholders (`{style}`,
+`{{name}}`, `${x}`), so filled-in templates still match. Add `--words 5` for a stricter
+pass that catches short fragments, such as the part of a prompt a truncated provider error
+still quotes. The scanner finds verbatim copies, including escaped and partial ones; it
+cannot see a paraphrase. A field that a model writes from the template
 (a tool argument, a "revised prompt", a node parameter) can leak the recipe in other
 words, so make sure no such field reaches the browser rather than relying on the scan. Also check by hand in the browser: Application tab
 (localStorage, IndexedDB, cookies), the console, the rendered DOM, and a forced error

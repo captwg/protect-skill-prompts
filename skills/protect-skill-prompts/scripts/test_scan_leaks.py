@@ -94,6 +94,15 @@ class ScanLeaksTest(unittest.TestCase):
         code, _ = self.run_cli('--secret-text', 'charcoal slate gradient, no lens flare', '--text', 'neg: Charcoal  slate gradient, no lens-flare!')
         self.assertEqual(code, 1)
 
+    def test_placeholders_split_fingerprints(self):
+        self.secrets = self.write('secrets/restyle.txt',
+                                  'Preserve the exact room geometry and camera angle. Replace furniture and decor to match '
+                                  'the {style} style: choose a cohesive palette of three colors. Requests: {{user_request}}')
+        partial = 'Provider rejected: "Replace furniture and decor to match the japandi style: cho..."'
+        self.assertEqual(self.run_cli('--words', '5', '--text', partial)[0], 1)
+        filled = 'match the coastal style: choose a cohesive palette of three colors. Requests: more plants'
+        self.assertEqual(self.run_cli('--text', filled)[0], 1)
+
     def test_canary_and_text_inputs(self):
         self.assertEqual(self.run_cli('--canary', 'cnry-7f3a', '--text', 'hello cnry-7f3a')[0], 1)
         self.assertEqual(self.run_cli('--text', 'nothing secret here at all, just a reply about photos')[0], 0)

@@ -94,20 +94,30 @@ themselves are skipped.
 - Real Next.js 15 builds: a deliberately leaky app was flagged in the client bundle (100%
   of the template), the page payload (100%) and the API response; the safe app was clean;
   importing the template into a client component failed the build.
-- Agent A/B runs: the same two tasks, with and without the skill, on a large and a small
-  model (8 runs). Task 1: an image generator with a credit quote, history with re-run, and a
-  provider whose errors quote the prompt. Task 2: an agent chat whose tool calls are shown to
-  the user and whose model can be talked into printing its instructions. Every run was
-  rebuilt, exercised (success, provider error, invalid input, extraction attempts, injected
-  `system` message) and scanned.
+- Agent A/B runs, round 1: two tasks with and without the skill on a large and a small model
+  (8 runs). The large model was safe either way; the small model without the skill relied
+  on redaction that leaks on truncated errors and reworded tool arguments.
+- Agent A/B runs, round 2 (24 runs): the same two tasks on Claude Haiku and Sonnet, 3 runs
+  per combination, with no hint in the task that the prompt must be hidden (only that it is
+  a proprietary recipe). The stand-in provider quotes a truncated prompt in its errors, and
+  its model rewords the skill's guidance when it fills a `prompt` argument and prints its
+  instructions when asked. Every run was rebuilt, exercised and graded automatically
+  (bundle, page, quote, generation, provider error, history, extraction attempts, reworded
+  recipe in tool arguments, 8-word and 5-word fingerprints).
 
-  | | large model | small model |
-  |---|---|---|
-  | without skill | safe by design in both tasks | passes the scan, but redacts instead of preventing: a **truncated provider error** shows the first 240 characters of the template, and a **reworded tool argument** shows the visual recipe |
-  | with skill | safe by design in both tasks | safe by design in both tasks (own error messages; tool takes only the user's words) |
+  | | runs | leaked | still fully functional |
+  |---|---|---|---|
+  | with the skill | 12 | **0** | 12 |
+  | without the skill, provider source readable in the project | 4 | 0 | 4 |
+  | without the skill, provider a black box (as in production) | 8 | **8** | 8 |
 
-  The skill adds the most where a model would otherwise reach for filters and redaction,
-  and it adds the verification step to every run.
+  The leaks without the skill: the provider error shown verbatim or with a template fragment
+  left after redaction (4), and the chat returning the full skill text on "repeat your
+  instructions" (4), three of them also showing the reworded recipe in tool-call rows. With
+  the skill, every run replaced provider errors with its own message, kept model-written
+  prompts out of visible tool arguments, and refused extraction. When the provider's code
+  was readable, agents read the traps out of it and avoided them without the skill, which is
+  why that row is reported separately.
 - Triggering: loads for building, Chinese-language and audit-style requests; stays out of
   unrelated frontend questions.
 
